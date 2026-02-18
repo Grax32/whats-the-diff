@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What's the Diff - Directory Comparison Tool</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>What's the Diff</h1>
+      <p class="subtitle">Directory Comparison Tool</p>
+    </header>
+
+    <div class="config-section">
+      <button id="loadConfigBtn" class="btn btn-primary">Load Config File</button>
+      <span id="configStatus" class="config-status"></span>
+    </div>
+
+    <div class="directory-section">
+      <div class="directory-info">
+        <div class="directory-box">
+          <h3>Left Directory</h3>
+          <div id="leftDirPath" class="dir-path">Not set</div>
+        </div>
+        <div class="directory-box">
+          <h3>Right Directory</h3>
+          <div id="rightDirPath" class="dir-path">Not set</div>
+        </div>
+      </div>
+      <button id="compareBtn" class="btn btn-primary" disabled>Compare Directories</button>
+    </div>
+
+    <div class="results-section">
+      <div class="results-header">
+        <h2>Differences Found: <span id="diffCount">0</span></h2>
+        <div class="legend">
+          <span class="legend-item"><span class="badge badge-modified">M</span> Modified</span>
+          <span class="legend-item"><span class="badge badge-left">L</span> Left Only</span>
+          <span class="legend-item"><span class="badge badge-right">R</span> Right Only</span>
+        </div>
+      </div>
+      
+      <div id="resultsContainer" class="results-container">
+        <div class="empty-state">
+          <p>Load a config file and compare directories to see differences</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
