@@ -4,7 +4,7 @@
   "description": "Comparison tool intended to keep base files in sync when applications use the same configuration",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc && node build-renderer.js && npm run copy-assets",
+    "build": "tsc && tsc -p tsconfig.renderer.json && npm run copy-assets",
     "copy-assets": "copyfiles -f index.html styles.css config.example.json dist",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron ."
@@ -18,14 +18,9 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/diff": "^7.0.2",
     "@types/node": "^25.2.3",
     "copyfiles": "^2.4.1",
     "electron": "^40.4.1",
-    "esbuild": "^0.27.3",
     "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "diff": "^8.0.3"
   }
 }

@@ -1,7 +1,4 @@
-interface Config {
-  leftDirectory: string;
-  rightDirectory: string;
-}
+import * as Diff from 'diff';
 
 interface FileDifference {
   type: 'modified' | 'left-only' | 'right-only' | 'synced';
@@ -20,9 +17,10 @@ interface CopyFileResult {
 }
 
 interface ElectronAPI {
-  loadConfig: () => Promise<Config | null>;
+  selectDirectory: () => Promise<string | null>;
   compareDirectories: (leftDir: string, rightDir: string) => Promise<FileDifference[]>;
   copyFile: (sourcePath: string, destPath: string, direction: string) => Promise<CopyFileResult>;
+  readFile: (filePath: string) => Promise<string | null>;
 }
 
 declare global {
@@ -31,49 +29,75 @@ declare global {
   }
 }
 
-let currentConfig: Config | null = null;
+let leftDirectory: string | null = null;
+let rightDirectory: string | null = null;
 let differences: FileDifference[] = [];
 let ignoredFiles = new Set<string>();
 
 // DOM elements
-const loadConfigBtn = document.getElementById('loadConfigBtn') as HTMLButtonElement;
+const selectLeftBtn = document.getElementById('selectLeftBtn') as HTMLButtonElement;
+const selectRightBtn = document.getElementById('selectRightBtn') as HTMLButtonElement;
 const compareBtn = document.getElementById('compareBtn') as HTMLButtonElement;
-const configStatus = document.getElementById('configStatus') as HTMLElement;
 const leftDirPath = document.getElementById('leftDirPath') as HTMLElement;
 const rightDirPath = document.getElementById('rightDirPath') as HTMLElement;
 const resultsContainer = document.getElementById('resultsContainer') as HTMLElement;
 const diffCount = document.getElementById('diffCount') as HTMLElement;
+const compareModal = document.getElementById('compareModal') as HTMLElement;
+const closeModal = document.getElementById('closeModal') as HTMLButtonElement;
+const compareFileName = document.getElementById('compareFileName') as HTMLElement;
+const leftFileContent = document.getElementById('leftFileContent') as HTMLElement;
+const rightFileContent = document.getElementById('rightFileContent') as HTMLElement;
 
 // Event listeners
-loadConfigBtn.addEventListener('click', loadConfig);
+selectLeftBtn.addEventListener('click', selectLeftDirectory);
+selectRightBtn.addEventListener('click', selectRightDirectory);
 compareBtn.addEventListener('click', compareDirectories);
+closeModal.addEventListener('click', () => {
+  compareModal.classList.remove('active');
+});
+compareModal.addEventListener('click', (e) => {
+  if (e.target === compareModal) {
+    compareModal.classList.remove('active');
+  }
+});
 
-async function loadConfig(): Promise<void> {
+async function selectLeftDirectory(): Promise<void> {
   try {
-    const config = await window.electronAPI.loadConfig();
-    
-    if (config) {
-      currentConfig = config;
-      
-      // Update UI
-      leftDirPath.textContent = config.leftDirectory || 'Not specified in config';
-      rightDirPath.textContent = config.rightDirectory || 'Not specified in config';
-      configStatus.textContent = '✓ Config loaded successfully';
+    const dir = await window.electronAPI.selectDirectory();
+    if (dir) {
+      leftDirectory = dir;
+      leftDirPath.textContent = dir;
       
       // Enable compare button if both directories are set
-      if (config.leftDirectory && config.rightDirectory) {
+      if (leftDirectory && rightDirectory) {
         compareBtn.disabled = false;
       }
     }
   } catch (error) {
-    configStatus.textContent = `✗ Error loading config: ${(error as Error).message}`;
-    configStatus.style.color = '#dc3545';
+    alert(`Error selecting directory: ${(error as Error).message}`);
+  }
+}
+
+async function selectRightDirectory(): Promise<void> {
+  try {
+    const dir = await window.electronAPI.selectDirectory();
+    if (dir) {
+      rightDirectory = dir;
+      rightDirPath.textContent = dir;
+      
+      // Enable compare button if both directories are set
+      if (leftDirectory && rightDirectory) {
+        compareBtn.disabled = false;
+      }
+    }
+  } catch (error) {
+    alert(`Error selecting directory: ${(error as Error).message}`);
   }
 }
 
 async function compareDirectories(): Promise<void> {
-  if (!currentConfig || !currentConfig.leftDirectory || !currentConfig.rightDirectory) {
-    alert('Please load a valid config file first');
+  if (!leftDirectory || !rightDirectory) {
+    alert('Please select both directories first');
     return;
   }
 
@@ -83,8 +107,8 @@ async function compareDirectories(): Promise<void> {
 
   try {
     differences = await window.electronAPI.compareDirectories(
-      currentConfig.leftDirectory,
-      currentConfig.rightDirectory
+      leftDirectory,
+      rightDirectory
     );
 
     ignoredFiles.clear();
@@ -147,10 +171,14 @@ function createDiffItem(diff: FileDifference): HTMLElement {
   `;
 
   // Add event listeners to buttons
+  const viewBtn = item.querySelector('.view-file') as HTMLButtonElement | null;
   const copyLeftBtn = item.querySelector('.copy-left') as HTMLButtonElement | null;
   const copyRightBtn = item.querySelector('.copy-right') as HTMLButtonElement | null;
   const ignoreBtn = item.querySelector('.ignore') as HTMLButtonElement | null;
 
+  if (viewBtn) {
+    viewBtn.addEventListener('click', () => openCompareView(diff));
+  }
   if (copyLeftBtn) {
     copyLeftBtn.addEventListener('click', () => copyLeftToRight(diff, item));
   }
@@ -192,6 +220,9 @@ function getTypeLabel(type: string): string {
 
 function createActionButtons(diff: FileDifference): string {
   const buttons: string[] = [];
+
+  // Add view button for all types
+  buttons.push('<button class="btn btn-action btn-view view-file">View</button>');
 
   if (diff.type === 'modified' || diff.type === 'left-only') {
     buttons.push('<button class="btn btn-action btn-copy-left copy-left">Copy L→R</button>');
@@ -329,6 +360,115 @@ function formatBytes(bytes: number | undefined): string {
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleString();
+}
+
+async function openCompareView(diff: FileDifference): Promise<void> {
+  compareFileName.textContent = diff.path;
+  
+  // Show loading state and reset classes
+  leftFileContent.innerHTML = '<div class="loading">Loading...</div>';
+  rightFileContent.innerHTML = '<div class="loading">Loading...</div>';
+  leftFileContent.classList.remove('binary', 'plain-text');
+  rightFileContent.classList.remove('binary', 'plain-text');
+  
+  // Show modal
+  compareModal.classList.add('active');
+  
+  // Load file contents
+  const leftContent = diff.type !== 'right-only' ? await window.electronAPI.readFile(diff.leftPath) : null;
+  const rightContent = diff.type !== 'left-only' ? await window.electronAPI.readFile(diff.rightPath) : null;
+  
+  // Handle missing files
+  if (diff.type === 'right-only') {
+    leftFileContent.innerHTML = '<div class="missing-file">File does not exist in left directory</div>';
+    leftFileContent.classList.add('binary');
+  } else if (leftContent === null) {
+    leftFileContent.innerHTML = '<div class="missing-file">Binary file or unable to read</div>';
+    leftFileContent.classList.add('binary');
+  }
+  
+  if (diff.type === 'left-only') {
+    rightFileContent.innerHTML = '<div class="missing-file">File does not exist in right directory</div>';
+    rightFileContent.classList.add('binary');
+  } else if (rightContent === null) {
+    rightFileContent.innerHTML = '<div class="missing-file">Binary file or unable to read</div>';
+    rightFileContent.classList.add('binary');
+  }
+  
+  // If both files exist and are readable, show diff
+  if (leftContent !== null && rightContent !== null && diff.type === 'modified') {
+    displayDiff(leftContent, rightContent);
+  } else {
+    // Just display plain content for non-modified files
+    if (leftContent !== null && diff.type !== 'right-only') {
+      leftFileContent.textContent = normalizeLineEndings(leftContent);
+      leftFileContent.classList.add('plain-text');
+    }
+    if (rightContent !== null && diff.type !== 'left-only') {
+      rightFileContent.textContent = normalizeLineEndings(rightContent);
+      rightFileContent.classList.add('plain-text');
+    }
+  }
+}
+
+function normalizeLineEndings(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function displayDiff(leftContent: string, rightContent: string): void {
+  // Normalize line endings before comparison
+  const normalizedLeft = normalizeLineEndings(leftContent);
+  const normalizedRight = normalizeLineEndings(rightContent);
+  
+  const diffResult = Diff.diffLines(normalizedLeft, normalizedRight);
+  
+  let leftHtml = '';
+  let rightHtml = '';
+  let leftLineNum = 1;
+  let rightLineNum = 1;
+  
+  diffResult.forEach((part) => {
+    const lines = part.value.split('\n');
+    // Remove last empty line if exists
+    if (lines[lines.length - 1] === '') {
+      lines.pop();
+    }
+    
+    lines.forEach((line, index) => {
+      const isLastLine = index === lines.length - 1 && part === diffResult[diffResult.length - 1];
+      const displayLine = line || ' '; // Show space for empty lines
+      const escapedLine = escapeHtml(displayLine);
+      
+      if (part.added) {
+        // Added in right only
+        leftHtml += `<div class="diff-line diff-empty"><span class="line-num"></span><span class="line-content"></span></div>`;
+        rightHtml += `<div class="diff-line diff-added"><span class="line-num">${rightLineNum}</span><span class="line-content">${escapedLine}</span></div>`;
+        rightLineNum++;
+      } else if (part.removed) {
+        // Removed from left
+        leftHtml += `<div class="diff-line diff-removed"><span class="line-num">${leftLineNum}</span><span class="line-content">${escapedLine}</span></div>`;
+        rightHtml += `<div class="diff-line diff-empty"><span class="line-num"></span><span class="line-content"></span></div>`;
+        leftLineNum++;
+      } else {
+        // Unchanged
+        leftHtml += `<div class="diff-line"><span class="line-num">${leftLineNum}</span><span class="line-content">${escapedLine}</span></div>`;
+        rightHtml += `<div class="diff-line"><span class="line-num">${rightLineNum}</span><span class="line-content">${escapedLine}</span></div>`;
+        leftLineNum++;
+        rightLineNum++;
+      }
+    });
+  });
+  
+  leftFileContent.innerHTML = leftHtml;
+  rightFileContent.innerHTML = rightHtml;
+  leftFileContent.classList.remove('binary', 'plain-text');
+  rightFileContent.classList.remove('binary', 'plain-text');
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // Export an empty object to make this a module

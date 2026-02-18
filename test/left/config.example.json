@@ -1,0 +1,4 @@
+{
+  "leftDirectory": "/path/to/left/directory",
+  "rightDirectory": "/path/to/right/directory"
+}

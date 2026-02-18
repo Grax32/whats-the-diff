@@ -32,11 +32,6 @@ app.on('activate', () => {
   }
 });
 
-interface Config {
-  leftDirectory: string;
-  rightDirectory: string;
-}
-
 interface CopyFileResult {
   success: boolean;
   error?: string;
@@ -54,21 +49,25 @@ interface FileDifference {
 }
 
 // IPC handlers
-ipcMain.handle('load-config', async (_event: IpcMainInvokeEvent): Promise<Config | null> => {
+ipcMain.handle('select-directory', async (_event: IpcMainInvokeEvent): Promise<string | null> => {
   const result: OpenDialogReturnValue = await dialog.showOpenDialog(mainWindow!, {
-    properties: ['openFile'],
-    filters: [
-      { name: 'JSON Files', extensions: ['json'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
+    properties: ['openDirectory']
   });
 
   if (!result.canceled && result.filePaths.length > 0) {
-    const configPath = result.filePaths[0];
-    const configContent = await fs.readFile(configPath, 'utf-8');
-    return JSON.parse(configContent) as Config;
+    return result.filePaths[0];
   }
   return null;
+});
+
+ipcMain.handle('read-file', async (_event: IpcMainInvokeEvent, filePath: string): Promise<string | null> => {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    return content;
+  } catch (error) {
+    // File might be binary or not exist
+    return null;
+  }
 });
 
 ipcMain.handle('compare-directories', async (_event: IpcMainInvokeEvent, leftDir: string, rightDir: string): Promise<FileDifference[]> => {
@@ -112,7 +111,11 @@ async function compareDirectories(leftDir: string, rightDir: string): Promise<Fi
           const leftContent = await fs.readFile(leftPath);
           const rightContent = await fs.readFile(rightPath);
           
-          if (!leftContent.equals(rightContent)) {
+          // Normalize line endings for comparison
+          const leftNormalized = leftContent.toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          const rightNormalized = rightContent.toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          
+          if (leftNormalized !== rightNormalized) {
             const leftStat = await fs.stat(leftPath);
             const rightStat = await fs.stat(rightPath);
             
