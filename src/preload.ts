@@ -10,9 +10,20 @@ interface CopyFileResult {
   error?: string;
 }
 
+interface FileDifference {
+  type: 'modified' | 'left-only' | 'right-only';
+  path: string;
+  leftPath: string;
+  rightPath: string;
+  leftSize?: number;
+  rightSize?: number;
+  leftModified?: string;
+  rightModified?: string;
+}
+
 interface ElectronAPI {
   loadConfig: () => Promise<Config | null>;
-  compareDirectories: (leftDir: string, rightDir: string) => Promise<any[]>;
+  compareDirectories: (leftDir: string, rightDir: string) => Promise<FileDifference[]>;
   copyFile: (sourcePath: string, destPath: string, direction: string) => Promise<CopyFileResult>;
 }
 
