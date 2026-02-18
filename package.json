@@ -1,7 +1,7 @@
 {
   "name": "whats-the-diff",
   "version": "1.0.0",
-  "description": "Comparison tool intended to keep based files in sync when applications use the same configuration",
+  "description": "Comparison tool intended to keep base files in sync when applications use the same configuration",
   "main": "main.js",
   "scripts": {
     "start": "electron ."

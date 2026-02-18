@@ -1,6 +1,6 @@
 # whats-the-diff
 
-Comparison tool intended to keep based files in sync when applications use the same configuration.
+Comparison tool intended to keep base files in sync when applications use the same configuration.
 
 ## Overview
 
