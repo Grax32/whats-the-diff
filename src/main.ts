@@ -1,11 +1,10 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const path = require('path');
-const fs = require('fs').promises;
-const fsSync = require('fs');
+import { app, BrowserWindow, ipcMain, dialog, IpcMainInvokeEvent, OpenDialogReturnValue } from 'electron';
+import * as path from 'path';
+import { promises as fs } from 'fs';
 
-let mainWindow;
+let mainWindow: BrowserWindow | null;
 
-function createWindow() {
+function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -16,7 +15,7 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
 }
 
 app.whenReady().then(createWindow);
@@ -33,9 +32,30 @@ app.on('activate', () => {
   }
 });
 
+interface Config {
+  leftDirectory: string;
+  rightDirectory: string;
+}
+
+interface CopyFileResult {
+  success: boolean;
+  error?: string;
+}
+
+interface FileDifference {
+  type: 'modified' | 'left-only' | 'right-only';
+  path: string;
+  leftPath: string;
+  rightPath: string;
+  leftSize?: number;
+  rightSize?: number;
+  leftModified?: string;
+  rightModified?: string;
+}
+
 // IPC handlers
-ipcMain.handle('load-config', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+ipcMain.handle('load-config', async (_event: IpcMainInvokeEvent): Promise<Config | null> => {
+  const result: OpenDialogReturnValue = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],
     filters: [
       { name: 'JSON Files', extensions: ['json'] },
@@ -46,17 +66,17 @@ ipcMain.handle('load-config', async () => {
   if (!result.canceled && result.filePaths.length > 0) {
     const configPath = result.filePaths[0];
     const configContent = await fs.readFile(configPath, 'utf-8');
-    return JSON.parse(configContent);
+    return JSON.parse(configContent) as Config;
   }
   return null;
 });
 
-ipcMain.handle('compare-directories', async (event, leftDir, rightDir) => {
+ipcMain.handle('compare-directories', async (_event: IpcMainInvokeEvent, leftDir: string, rightDir: string): Promise<FileDifference[]> => {
   const differences = await compareDirectories(leftDir, rightDir);
   return differences;
 });
 
-ipcMain.handle('copy-file', async (event, sourcePath, destPath, direction) => {
+ipcMain.handle('copy-file', async (_event: IpcMainInvokeEvent, sourcePath: string, destPath: string, direction: string): Promise<CopyFileResult> => {
   try {
     // Ensure destination directory exists
     const destDir = path.dirname(destPath);
@@ -66,14 +86,14 @@ ipcMain.handle('copy-file', async (event, sourcePath, destPath, direction) => {
     await fs.copyFile(sourcePath, destPath);
     return { success: true };
   } catch (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 });
 
-async function compareDirectories(leftDir, rightDir) {
-  const differences = [];
+async function compareDirectories(leftDir: string, rightDir: string): Promise<FileDifference[]> {
+  const differences: FileDifference[] = [];
   
-  async function scanDirectory(dir, relativePath = '') {
+  async function scanDirectory(dir: string, relativePath: string = ''): Promise<void> {
     const items = await fs.readdir(path.join(dir, relativePath), { withFileTypes: true });
     
     for (const item of items) {
@@ -141,7 +161,7 @@ async function compareDirectories(leftDir, rightDir) {
   return uniqueDiffs.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-async function fileExists(filePath) {
+async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
     return true;

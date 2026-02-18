@@ -2,9 +2,12 @@
   "name": "whats-the-diff",
   "version": "1.0.0",
   "description": "Comparison tool intended to keep base files in sync when applications use the same configuration",
-  "main": "main.js",
+  "main": "dist/main.js",
   "scripts": {
-    "start": "electron ."
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "cp index.html dist/ && cp styles.css dist/ && cp config.example.json dist/",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron ."
   },
   "keywords": [
     "electron",
@@ -15,6 +18,8 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^40.4.1"
+    "@types/node": "^25.2.3",
+    "electron": "^40.4.1",
+    "typescript": "^5.9.3"
   }
 }

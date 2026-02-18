@@ -19,6 +19,12 @@ What's the Diff is an Electron-based desktop application that compares two direc
   - Ignore the change
 - **File Information**: View file sizes and modification times for easy comparison
 
+## Technology Stack
+
+- **TypeScript**: Type-safe development
+- **Electron**: Desktop application framework
+- **npm**: Package management and build system
+
 ## Installation
 
 1. Clone this repository
@@ -27,9 +33,22 @@ What's the Diff is an Electron-based desktop application that compares two direc
    npm install
    ```
 
+## Building
+
+The project uses TypeScript and requires a build step to compile the source code to JavaScript:
+
+```bash
+npm run build
+```
+
+This will:
+- Compile TypeScript files from `src/` to JavaScript in `dist/`
+- Copy required assets (HTML, CSS, config) to `dist/`
+- Generate source maps for debugging
+
 ## Usage
 
-1. Start the application:
+1. Build and start the application:
    ```bash
    npm start
    ```
@@ -50,6 +69,31 @@ What's the Diff is an Electron-based desktop application that compares two direc
    - **Copy L→R**: Copy the file from left directory to right directory
    - **Copy R→L**: Copy the file from right directory to left directory
    - **Ignore**: Hide this difference from the count (visual only)
+
+## Development
+
+For development, you can use:
+
+```bash
+npm run dev
+```
+
+This will build the project and start the Electron application.
+
+## Project Structure
+
+```
+whats-the-diff/
+├── src/              # TypeScript source files
+│   ├── main.ts       # Main Electron process
+│   ├── preload.ts    # Preload script for IPC
+│   └── renderer.ts   # Renderer process (UI logic)
+├── dist/             # Compiled JavaScript (generated)
+├── index.html        # Application UI
+├── styles.css        # Application styles
+├── tsconfig.json     # TypeScript configuration
+└── package.json      # npm configuration
+```
 
 ## Config File Format
 

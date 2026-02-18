@@ -1,21 +1,54 @@
-let currentConfig = null;
-let differences = [];
-let ignoredFiles = new Set();
+interface Config {
+  leftDirectory: string;
+  rightDirectory: string;
+}
+
+interface FileDifference {
+  type: 'modified' | 'left-only' | 'right-only' | 'synced';
+  path: string;
+  leftPath: string;
+  rightPath: string;
+  leftSize?: number;
+  rightSize?: number;
+  leftModified?: string;
+  rightModified?: string;
+}
+
+interface CopyFileResult {
+  success: boolean;
+  error?: string;
+}
+
+interface ElectronAPI {
+  loadConfig: () => Promise<Config | null>;
+  compareDirectories: (leftDir: string, rightDir: string) => Promise<FileDifference[]>;
+  copyFile: (sourcePath: string, destPath: string, direction: string) => Promise<CopyFileResult>;
+}
+
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}
+
+let currentConfig: Config | null = null;
+let differences: FileDifference[] = [];
+let ignoredFiles = new Set<string>();
 
 // DOM elements
-const loadConfigBtn = document.getElementById('loadConfigBtn');
-const compareBtn = document.getElementById('compareBtn');
-const configStatus = document.getElementById('configStatus');
-const leftDirPath = document.getElementById('leftDirPath');
-const rightDirPath = document.getElementById('rightDirPath');
-const resultsContainer = document.getElementById('resultsContainer');
-const diffCount = document.getElementById('diffCount');
+const loadConfigBtn = document.getElementById('loadConfigBtn') as HTMLButtonElement;
+const compareBtn = document.getElementById('compareBtn') as HTMLButtonElement;
+const configStatus = document.getElementById('configStatus') as HTMLElement;
+const leftDirPath = document.getElementById('leftDirPath') as HTMLElement;
+const rightDirPath = document.getElementById('rightDirPath') as HTMLElement;
+const resultsContainer = document.getElementById('resultsContainer') as HTMLElement;
+const diffCount = document.getElementById('diffCount') as HTMLElement;
 
 // Event listeners
 loadConfigBtn.addEventListener('click', loadConfig);
 compareBtn.addEventListener('click', compareDirectories);
 
-async function loadConfig() {
+async function loadConfig(): Promise<void> {
   try {
     const config = await window.electronAPI.loadConfig();
     
@@ -33,12 +66,12 @@ async function loadConfig() {
       }
     }
   } catch (error) {
-    configStatus.textContent = `✗ Error loading config: ${error.message}`;
+    configStatus.textContent = `✗ Error loading config: ${(error as Error).message}`;
     configStatus.style.color = '#dc3545';
   }
 }
 
-async function compareDirectories() {
+async function compareDirectories(): Promise<void> {
   if (!currentConfig || !currentConfig.leftDirectory || !currentConfig.rightDirectory) {
     alert('Please load a valid config file first');
     return;
@@ -62,7 +95,7 @@ async function compareDirectories() {
   } catch (error) {
     resultsContainer.innerHTML = `
       <div class="status-message status-error">
-        Error comparing directories: ${error.message}
+        Error comparing directories: ${(error as Error).message}
       </div>
     `;
     compareBtn.textContent = 'Compare Directories';
@@ -70,7 +103,7 @@ async function compareDirectories() {
   }
 }
 
-function displayResults() {
+function displayResults(): void {
   if (differences.length === 0) {
     resultsContainer.innerHTML = '<div class="empty-state"><p>No differences found. Directories are in sync!</p></div>';
     diffCount.textContent = '0';
@@ -88,7 +121,7 @@ function displayResults() {
   });
 }
 
-function createDiffItem(diff) {
+function createDiffItem(diff: FileDifference): HTMLElement {
   const item = document.createElement('div');
   item.className = 'diff-item';
   if (ignoredFiles.has(diff.path)) {
@@ -114,9 +147,9 @@ function createDiffItem(diff) {
   `;
 
   // Add event listeners to buttons
-  const copyLeftBtn = item.querySelector('.copy-left');
-  const copyRightBtn = item.querySelector('.copy-right');
-  const ignoreBtn = item.querySelector('.ignore');
+  const copyLeftBtn = item.querySelector('.copy-left') as HTMLButtonElement | null;
+  const copyRightBtn = item.querySelector('.copy-right') as HTMLButtonElement | null;
+  const ignoreBtn = item.querySelector('.ignore') as HTMLButtonElement | null;
 
   if (copyLeftBtn) {
     copyLeftBtn.addEventListener('click', () => copyLeftToRight(diff, item));
@@ -131,7 +164,7 @@ function createDiffItem(diff) {
   return item;
 }
 
-function getBadge(type) {
+function getBadge(type: string): { text: string; class: string } {
   switch (type) {
     case 'modified':
       return { text: 'M', class: 'badge-modified' };
@@ -144,7 +177,7 @@ function getBadge(type) {
   }
 }
 
-function getTypeLabel(type) {
+function getTypeLabel(type: string): string {
   switch (type) {
     case 'modified':
       return 'Modified';
@@ -157,8 +190,8 @@ function getTypeLabel(type) {
   }
 }
 
-function createActionButtons(diff) {
-  const buttons = [];
+function createActionButtons(diff: FileDifference): string {
+  const buttons: string[] = [];
 
   if (diff.type === 'modified' || diff.type === 'left-only') {
     buttons.push('<button class="btn btn-action btn-copy-left copy-left">Copy L→R</button>');
@@ -173,7 +206,7 @@ function createActionButtons(diff) {
   return buttons.join('');
 }
 
-function createDetailsHTML(diff) {
+function createDetailsHTML(diff: FileDifference): string {
   let html = '';
 
   // Left side
@@ -213,7 +246,7 @@ function createDetailsHTML(diff) {
   return html;
 }
 
-async function copyLeftToRight(diff, itemElement) {
+async function copyLeftToRight(diff: FileDifference, itemElement: HTMLElement): Promise<void> {
   const result = await window.electronAPI.copyFile(diff.leftPath, diff.rightPath, 'left-to-right');
   
   if (result.success) {
@@ -232,7 +265,7 @@ async function copyLeftToRight(diff, itemElement) {
   }
 }
 
-async function copyRightToLeft(diff, itemElement) {
+async function copyRightToLeft(diff: FileDifference, itemElement: HTMLElement): Promise<void> {
   const result = await window.electronAPI.copyFile(diff.rightPath, diff.leftPath, 'right-to-left');
   
   if (result.success) {
@@ -251,7 +284,7 @@ async function copyRightToLeft(diff, itemElement) {
   }
 }
 
-function toggleIgnore(diff, itemElement) {
+function toggleIgnore(diff: FileDifference, itemElement: HTMLElement): void {
   if (ignoredFiles.has(diff.path)) {
     ignoredFiles.delete(diff.path);
     itemElement.classList.remove('ignored');
@@ -265,7 +298,7 @@ function toggleIgnore(diff, itemElement) {
   diffCount.textContent = visibleDiffs.length.toString();
 }
 
-function showStatusMessage(itemElement, message, type) {
+function showStatusMessage(itemElement: HTMLElement, message: string, type: string): void {
   const existingMsg = itemElement.querySelector('.status-message');
   if (existingMsg) {
     existingMsg.remove();
@@ -283,7 +316,7 @@ function showStatusMessage(itemElement, message, type) {
   }
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (bytes === 0 || bytes === undefined) return '0 Bytes';
 
   const k = 1024;
@@ -293,7 +326,10 @@ function formatBytes(bytes) {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-function formatDate(dateString) {
+function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleString();
 }
+
+// Export an empty object to make this a module
+export {};
