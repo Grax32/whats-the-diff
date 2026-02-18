@@ -5,7 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc && npm run copy-assets",
-    "copy-assets": "cp index.html dist/ && cp styles.css dist/ && cp config.example.json dist/",
+    "copy-assets": "copyfiles -f index.html styles.css config.example.json dist",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron ."
   },
@@ -19,6 +19,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^25.2.3",
+    "copyfiles": "^2.4.1",
     "electron": "^40.4.1",
     "typescript": "^5.9.3"
   }
